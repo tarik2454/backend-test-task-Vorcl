@@ -1,6 +1,9 @@
 const fastify = require('fastify')({ logger: true });
+const { MongoClient } = require('mongodb');
 const websocketPlugin = require('./plugins/websocket');
 const userRoutes = require('./routes/userRoutes');
+const userSchema = require('./schemas/userSchema');
+const userService = require('./services/userService');
 
 // Регистрируем плагины
 fastify.register(websocketPlugin);
@@ -11,6 +14,35 @@ fastify.register(require('@fastify/mongodb'), {
 
 // Регистрируем маршруты
 fastify.register(userRoutes);
+
+// Новый маршрут для регистрации пользователя
+fastify.post('/register', {
+  schema: {
+    body: {
+      type: 'object',
+      properties: {
+        email: { type: 'string', format: 'email' },
+      },
+      required: ['email'],
+    },
+  },
+  handler: async (req, reply) => {
+    const { email } = req.body;
+
+    // Логика для добавления пользователя в базу данных
+    try {
+      const result = await userService.createUser({ email });
+      reply.code(201).send({
+        message: 'Пользователь успешно зарегистрирован',
+        user: result,
+      });
+    } catch (err) {
+      reply
+        .code(500)
+        .send({ message: 'Произошла ошибка при регистрации пользователя' });
+    }
+  },
+});
 
 // Стартуем сервер
 const start = async () => {
