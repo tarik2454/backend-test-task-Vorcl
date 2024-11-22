@@ -1,26 +1,30 @@
-const { MongoClient, ObjectId } = require('mongodb');
+// services/userService.js
+const { MongoClient } = require('mongodb');
 
-const url = 'mongodb://localhost:27017';
-const dbName = 'mydb';
+const url =
+  'mongodb+srv://tarik2454:7L1CXhUWy9EM1t2u@cluster0.f0ezl.mongodb.net/';
+const dbName = 'backend-test-task-Vorcl';
 
-const createUser = async user => {
+const registerUser = async email => {
   const client = new MongoClient(url);
-  await client.connect();
-  const db = client.db(dbName);
-  const collection = db.collection('users');
-  const result = await collection.insertOne(user);
-  await client.close();
-  return result.ops[0]; // Возвращаем созданного пользователя
+  try {
+    await client.connect();
+    const db = client.db(dbName);
+    const collection = db.collection('users');
+    const newUser = { email };
+    const result = await collection.insertOne(newUser); // Вставка нового пользователя
+
+    // Возвращаем email и ID нового пользователя
+    return {
+      email,
+      _id: result.insertedId,
+    };
+  } catch (err) {
+    console.error('Ошибка при записи в базу:', err);
+    throw err;
+  } finally {
+    await client.close();
+  }
 };
 
-const getUserById = async id => {
-  const client = new MongoClient(url);
-  await client.connect();
-  const db = client.db(dbName);
-  const collection = db.collection('users');
-  const user = await collection.findOne({ _id: ObjectId(id) });
-  await client.close();
-  return user;
-};
-
-module.exports = { createUser, getUserById };
+module.exports = { registerUser };

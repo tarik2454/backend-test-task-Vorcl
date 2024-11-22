@@ -1,54 +1,47 @@
 const fastify = require('fastify')({ logger: true });
-const { MongoClient } = require('mongodb');
+const axios = require('axios'); // Ensure axios is imported here
 const websocketPlugin = require('./plugins/websocket');
 const userRoutes = require('./routes/userRoutes');
-const userSchema = require('./schemas/userSchema');
-const userService = require('./services/userService');
+const cors = require('@fastify/cors');
 
-// Регистрируем плагины
+fastify.register(cors, {
+  origin: ['http://localhost:3000'], // Allow only localhost:3000
+  methods: ['GET', 'POST', 'PUT', 'DELETE'], // Allowed methods
+  allowedHeaders: ['Content-Type', 'Authorization'], // Allowed headers
+});
+
+// Register plugins
 fastify.register(websocketPlugin);
 fastify.register(require('@fastify/mongodb'), {
   forceClose: true,
   url: 'mongodb+srv://tarik2454:7L1CXhUWy9EM1t2u@cluster0.f0ezl.mongodb.net/',
 });
-
-// Регистрируем маршруты
 fastify.register(userRoutes);
 
-// Новый маршрут для регистрации пользователя
-fastify.post('/register', {
-  schema: {
-    body: {
-      type: 'object',
-      properties: {
-        email: { type: 'string', format: 'email' },
-      },
-      required: ['email'],
-    },
-  },
-  handler: async (req, reply) => {
-    const { email } = req.body;
+// Proxy route for stock data
+fastify.get('/api/stock', async (request, reply) => {
+  const { symbol, country } = request.query; // Get stock symbol from query
 
-    // Логика для добавления пользователя в базу данных
-    try {
-      const result = await userService.createUser({ email });
-      reply.code(201).send({
-        message: 'Пользователь успешно зарегистрирован',
-        user: result,
-      });
-    } catch (err) {
-      reply
-        .code(500)
-        .send({ message: 'Произошла ошибка при регистрации пользователя' });
-    }
-  },
+  if (!symbol) {
+    return reply.status(400).send({ error: 'Stock symbol is required' });
+  }
+
+  try {
+    const response = await axios.get(
+      `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?range=1d&interval=5m&country={${country}}`
+    );
+    return reply.send(response.data);
+  } catch (error) {
+    console.error(error);
+    return reply.status(500).send({ error: 'Error fetching data' });
+  }
 });
 
-// Стартуем сервер
+// Start the server
 const start = async () => {
   try {
     await fastify.listen({ port: 3001, host: '0.0.0.0' });
-    console.log('Сервер запущен на http://localhost:3001');
+    console.log('Server is running at http://localhost:3001');
   } catch (err) {
     fastify.log.error(err);
     process.exit(1);
@@ -56,64 +49,3 @@ const start = async () => {
 };
 
 start();
-
-// const fastify = require('fastify')({ logger: true });
-// const fastifyWebsocket = require('@fastify/websocket');
-// const { ObjectId } = require('mongodb');
-
-// // Подключаем плагин WebSocket
-// fastify.register(fastifyWebsocket);
-
-// // Маршрут для WebSocket
-// fastify.get('/ws', { websocket: true }, (connection, req) => {
-//   console.log('Клиент подключился');
-
-//   // Слушаем сообщения от клиента
-//   connection.socket.on('message', message => {
-//     console.log('Получено сообщение от клиента:', message);
-
-//     // Отправляем ответ клиенту
-//     connection.socket.send(`Эхо: ${message}`);
-//   });
-
-//   // Закрытие соединения
-//   connection.socket.on('close', () => {
-//     console.log('Клиент отключился');
-//   });
-// });
-
-// // Подключение MongoDB
-// fastify.register(require('@fastify/mongodb'), {
-//   forceClose: true,
-//   url: 'mongodb+srv://tarik2454:7L1CXhUWy9EM1t2u@cluster0.f0ezl.mongodb.net/',
-// });
-
-// fastify.get('/', async (request, reply) => {
-//   return { message: 'Сервер работает!' };
-// });
-
-// // Получение пользователя по ID
-// fastify.get('/user/:id', async function (req, reply) {
-//   const users = this.mongo.db.collection('users');
-
-//   const id = this.mongo.ObjectId(req.params.id);
-//   try {
-//     const user = await users.findOne({ id });
-//     return user;
-//   } catch (err) {
-//     return err;
-//   }
-// });
-
-// // Запуск сервера
-// const start = async () => {
-//   try {
-//     await fastify.listen({ port: 3001, host: '0.0.0.0' });
-//     console.log('Сервер запущен на http://localhost:3001');
-//   } catch (err) {
-//     fastify.log.error(err);
-//     process.exit(1);
-//   }
-// };
-
-// start();

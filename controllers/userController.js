@@ -1,17 +1,29 @@
+// userController.js
 const userService = require('../services/userService');
 
-const getUserById = async (req, reply) => {
-  const { id } = req.params;
+const registerUser = async (req, reply) => {
+  console.log('Получен запрос на регистрацию:', req.body);
+
+  const { email } = req.body;
+
+  if (!email) {
+    reply.code(400).send({ message: 'Email не предоставлен' });
+    return;
+  }
+
   try {
-    const user = await userService.getUserById(id);
-    if (!user) {
-      reply.code(404).send({ message: 'Пользователь не найден' });
-    } else {
-      reply.send(user);
-    }
+    const newUser = await userService.registerUser(email);
+    console.log('Пользователь зарегистрирован:', newUser);
+    reply.send({
+      message: 'Пользователь успешно зарегистрирован',
+      user: newUser,
+    });
   } catch (err) {
-    reply.code(500).send({ message: 'Ошибка при получении пользователя' });
+    console.error('Ошибка регистрации пользователя:', err);
+    reply
+      .code(500)
+      .send({ message: 'Ошибка регистрации пользователя', error: err.message });
   }
 };
 
-module.exports = { getUserById };
+module.exports = { registerUser };
