@@ -1,4 +1,3 @@
-// services/userService.js
 const { MongoClient } = require('mongodb');
 
 const url =
@@ -12,9 +11,8 @@ const registerUser = async email => {
     const db = client.db(dbName);
     const collection = db.collection('users');
     const newUser = { email };
-    const result = await collection.insertOne(newUser); // Вставка нового пользователя
+    const result = await collection.insertOne(newUser);
 
-    // Возвращаем email и ID нового пользователя
     return {
       email,
       _id: result.insertedId,

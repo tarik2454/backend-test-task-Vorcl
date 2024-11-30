@@ -1,9 +1,6 @@
-// userController.js
 const userService = require('../services/userService');
 
 const registerUser = async (req, reply) => {
-  console.log('Получен запрос на регистрацию:', req.body);
-
   const { email } = req.body;
 
   if (!email) {
@@ -13,16 +10,15 @@ const registerUser = async (req, reply) => {
 
   try {
     const newUser = await userService.registerUser(email);
-    console.log('Пользователь зарегистрирован:', newUser);
     reply.send({
-      message: 'Пользователь успешно зарегистрирован',
+      message: 'User successfully registered',
       user: newUser,
     });
-  } catch (err) {
-    console.error('Ошибка регистрации пользователя:', err);
-    reply
-      .code(500)
-      .send({ message: 'Ошибка регистрации пользователя', error: err.message });
+  } catch (error) {
+    reply.code(500).send({
+      message: 'User registration error',
+      error: error.message,
+    });
   }
 };
 

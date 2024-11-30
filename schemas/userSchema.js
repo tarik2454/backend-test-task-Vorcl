@@ -1,4 +1,3 @@
-// schemas/userSchema.js
 const userSchema = {
   type: 'object',
   properties: {
