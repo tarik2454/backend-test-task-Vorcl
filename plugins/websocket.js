@@ -1,58 +1,62 @@
 const fs = require('fs');
 const fastifyWebsocket = require('@fastify/websocket');
+const path = require('path');
 
-// Функция преобразования Float32Array в PCM16
 function floatTo16BitPCM(float32Array) {
   const buffer = new ArrayBuffer(float32Array.length * 2);
   const view = new DataView(buffer);
-  let offset = 0;
-  for (let i = 0; i < float32Array.length; i++, offset += 2) {
+  for (let i = 0; i < float32Array.length; i++) {
     let s = Math.max(-1, Math.min(1, float32Array[i]));
-    view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+    view.setInt16(i * 2, s < 0 ? s * 0x8000 : s * 0x7fff, true);
   }
   return buffer;
 }
 
-// Функция преобразования Float32Array в Base64 PCM16
 function base64EncodeAudio(float32Array) {
   const arrayBuffer = floatTo16BitPCM(float32Array);
-  let binary = '';
-  const bytes = new Uint8Array(arrayBuffer);
-  const chunkSize = 0x8000; // 32KB
-  for (let i = 0; i < bytes.length; i += chunkSize) {
-    const chunk = bytes.subarray(i, i + chunkSize);
-    binary += String.fromCharCode.apply(null, chunk);
-  }
-  return Buffer.from(binary, 'binary').toString('base64');
+  return Buffer.from(new Uint8Array(arrayBuffer)).toString('base64');
 }
 
 module.exports = async fastify => {
   fastify.register(fastifyWebsocket);
 
   fastify.get('/ws', { websocket: true }, (connection, req) => {
-    console.log('Клиент подключился');
+    console.log('Client connected');
 
     connection.socket.on('message', async message => {
       try {
-        console.log('Получено сообщение от клиента');
-        const { filePath } = JSON.parse(message);
+        const parsedMessage = JSON.parse(message);
+        const { filePath } = parsedMessage;
 
-        if (!fs.existsSync(filePath)) {
-          connection.socket.send(JSON.stringify({ error: 'Файл не найден' }));
+        // Проверка пути к файлу
+        if (!filePath || typeof filePath !== 'string') {
+          throw new Error('Invalid file path');
+        }
+
+        const resolvedPath = path.resolve(filePath);
+        if (!fs.existsSync(resolvedPath)) {
+          console.error('File not found:', resolvedPath);
+          connection.socket.send(JSON.stringify({ error: 'File not found' }));
           return;
         }
 
-        const audioFile = fs.readFileSync(filePath);
+        const audioFile = fs.readFileSync(resolvedPath);
 
-        // Динамический импорт audio-decode
         const decodeAudio = (await import('audio-decode')).default;
-        const audioBuffer = await decodeAudio(audioFile);
-        const channelData = audioBuffer.getChannelData(0);
+        let audioBuffer;
+        try {
+          audioBuffer = await decodeAudio(audioFile);
+        } catch (err) {
+          console.error('Error decoding audio:', err);
+          connection.socket.send(
+            JSON.stringify({ error: 'Error decoding audio file' })
+          );
+          return;
+        }
 
-        // Преобразование в Base64
+        const channelData = audioBuffer.getChannelData(0);
         const base64Chunk = base64EncodeAudio(channelData);
 
-        // Отправка результата
         connection.socket.send(
           JSON.stringify({
             type: 'audio_base64',
@@ -60,15 +64,15 @@ module.exports = async fastify => {
           })
         );
       } catch (error) {
-        console.error('Ошибка при обработке аудио:', error);
+        console.error('Error processing message:', error);
         connection.socket.send(
-          JSON.stringify({ error: 'Ошибка при обработке аудио' })
+          JSON.stringify({ error: 'Error processing audio' })
         );
       }
     });
 
     connection.socket.on('close', () => {
-      console.log('Клиент отключился');
+      console.log('Client disconnected');
     });
   });
 };

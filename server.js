@@ -11,12 +11,12 @@ fastify.register(cors, {
   allowedHeaders: ['Content-Type', 'Authorization'],
 });
 
-fastify.register(websocketPlugin);
 fastify.register(require('@fastify/mongodb'), {
   forceClose: true,
-  url: 'mongodb+srv://tarik2454:7L1CXhUWy9EM1t2u@cluster0.f0ezl.mongodb.net/',
+  url: 'mongodb+srv://tarik2454:7L1CXhUWy9EM1t2u@cluster0.f0ezl.mongodb.net/backend-test-task-Vorcl?retryWrites=true&w=majority&appName=Cluster0',
 });
 
+fastify.register(websocketPlugin);
 fastify.register(userRoutes);
 fastify.register(stockRoutes);
 
