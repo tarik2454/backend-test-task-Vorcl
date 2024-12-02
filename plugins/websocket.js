@@ -1,21 +1,5 @@
-const fs = require('fs');
+const WebSocket = require('ws');
 const fastifyWebsocket = require('@fastify/websocket');
-const path = require('path');
-
-function floatTo16BitPCM(float32Array) {
-  const buffer = new ArrayBuffer(float32Array.length * 2);
-  const view = new DataView(buffer);
-  for (let i = 0; i < float32Array.length; i++) {
-    let s = Math.max(-1, Math.min(1, float32Array[i]));
-    view.setInt16(i * 2, s < 0 ? s * 0x8000 : s * 0x7fff, true);
-  }
-  return buffer;
-}
-
-function base64EncodeAudio(float32Array) {
-  const arrayBuffer = floatTo16BitPCM(float32Array);
-  return Buffer.from(new Uint8Array(arrayBuffer)).toString('base64');
-}
 
 module.exports = async fastify => {
   fastify.register(fastifyWebsocket);
@@ -23,56 +7,75 @@ module.exports = async fastify => {
   fastify.get('/ws', { websocket: true }, (connection, req) => {
     console.log('Client connected');
 
-    connection.socket.on('message', async message => {
+    const openAIUrl =
+      'wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01';
+
+    let openAISocket;
+
+    try {
+      openAISocket = new WebSocket(openAIUrl, {
+        headers: {
+          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+          'OpenAI-Beta': 'realtime=v1',
+        },
+      });
+    } catch (error) {
+      console.error('Failed to initialize OpenAI WebSocket:', error.message);
+      connection.send(
+        JSON.stringify({ error: 'Failed to connect to OpenAI WebSocket' })
+      );
+      connection.close();
+      return;
+    }
+
+    openAISocket.on('open', () => {
+      console.log('Connected to OpenAI WebSocket');
+    });
+
+    openAISocket.on('message', message => {
+      console.log('Message from OpenAI:', message.toString());
+      if (connection.readyState === WebSocket.OPEN) {
+        connection.send(message.toString());
+      } else {
+        console.error('Client connection is not open');
+      }
+    });
+
+    openAISocket.on('error', error => {
+      console.error('OpenAI WebSocket error:', error.message);
+      if (connection.readyState === WebSocket.OPEN) {
+        connection.send(JSON.stringify({ error: 'OpenAI error occurred' }));
+      }
+    });
+
+    openAISocket.on('close', () => {
+      console.log('OpenAI WebSocket closed');
+      if (connection.readyState === WebSocket.OPEN) {
+        connection.close();
+      }
+    });
+
+    connection.on('message', message => {
+      console.log('Message from client:', message.toString());
       try {
-        const parsedMessage = JSON.parse(message);
-        const { filePath } = parsedMessage;
-
-        // Проверка пути к файлу
-        if (!filePath || typeof filePath !== 'string') {
-          throw new Error('Invalid file path');
+        if (openAISocket.readyState === WebSocket.OPEN) {
+          openAISocket.send(message.toString());
+        } else {
+          console.error('OpenAI WebSocket not open');
         }
-
-        const resolvedPath = path.resolve(filePath);
-        if (!fs.existsSync(resolvedPath)) {
-          console.error('File not found:', resolvedPath);
-          connection.socket.send(JSON.stringify({ error: 'File not found' }));
-          return;
-        }
-
-        const audioFile = fs.readFileSync(resolvedPath);
-
-        const decodeAudio = (await import('audio-decode')).default;
-        let audioBuffer;
-        try {
-          audioBuffer = await decodeAudio(audioFile);
-        } catch (err) {
-          console.error('Error decoding audio:', err);
-          connection.socket.send(
-            JSON.stringify({ error: 'Error decoding audio file' })
-          );
-          return;
-        }
-
-        const channelData = audioBuffer.getChannelData(0);
-        const base64Chunk = base64EncodeAudio(channelData);
-
-        connection.socket.send(
-          JSON.stringify({
-            type: 'audio_base64',
-            data: base64Chunk,
-          })
-        );
-      } catch (error) {
-        console.error('Error processing message:', error);
-        connection.socket.send(
-          JSON.stringify({ error: 'Error processing audio' })
+      } catch (err) {
+        console.error('Error processing client message:', err.message);
+        connection.send(
+          JSON.stringify({ error: 'Error processing your message' })
         );
       }
     });
 
-    connection.socket.on('close', () => {
+    connection.on('close', () => {
       console.log('Client disconnected');
+      if (openAISocket.readyState === WebSocket.OPEN) {
+        openAISocket.close();
+      }
     });
   });
 };

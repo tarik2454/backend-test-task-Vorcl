@@ -1,7 +1,10 @@
 const { MongoClient } = require('mongodb');
 
-const url =
-  'mongodb+srv://tarik2454:7L1CXhUWy9EM1t2u@cluster0.f0ezl.mongodb.net/';
+require('dotenv').config();
+
+const mongoUrl = process.env.MONGO_URL;
+
+const url = mongoUrl;
 const dbName = 'backend-test-task-Vorcl';
 
 const registerUser = async email => {
@@ -10,6 +13,12 @@ const registerUser = async email => {
     await client.connect();
     const db = client.db(dbName);
     const collection = db.collection('users');
+
+    const existingUser = await collection.findOne({ email });
+    if (existingUser) {
+      throw new Error('A user with this email is already registered');
+    }
+
     const newUser = { email };
     const result = await collection.insertOne(newUser);
 
@@ -17,9 +26,8 @@ const registerUser = async email => {
       email,
       _id: result.insertedId,
     };
-  } catch (err) {
-    console.error('Ошибка при записи в базу:', err);
-    throw err;
+  } catch (error) {
+    throw new Error(error.message || 'Database operation failed');
   } finally {
     await client.close();
   }

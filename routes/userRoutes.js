@@ -1,9 +1,11 @@
 const userController = require('../controllers/userController');
 const userSchema = require('../schemas/userSchema');
 
-module.exports = async fastify => {
+module.exports = async function (fastify) {
   fastify.post('/register', {
-    schema: userSchema,
-    handler: userController.registerUser,
+    schema: {
+      body: userSchema,
+    },
+    handler: userController,
   });
 };

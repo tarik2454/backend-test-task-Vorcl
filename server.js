@@ -2,18 +2,19 @@ const fastify = require('fastify')({ logger: true });
 const websocketPlugin = require('./plugins/websocket');
 const userRoutes = require('./routes/userRoutes');
 const cors = require('@fastify/cors');
-const stockRoutes = require('./routes/stockRoutes'); // Добавьте правильный путь
+const stockRoutes = require('./routes/stockRoutes');
 
-// Регистрация необходимых плагинов
-fastify.register(cors, {
-  origin: ['http://localhost:3000'],
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+require('dotenv').config();
+
+fastify.addHook('onRequest', (request, reply, done) => {
+  reply.header('Access-Control-Allow-Origin', '*');
+  done();
 });
 
-fastify.register(require('@fastify/mongodb'), {
-  forceClose: true,
-  url: 'mongodb+srv://tarik2454:7L1CXhUWy9EM1t2u@cluster0.f0ezl.mongodb.net/backend-test-task-Vorcl?retryWrites=true&w=majority&appName=Cluster0',
+fastify.register(cors, {
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
 });
 
 fastify.register(websocketPlugin);
