@@ -6,6 +6,8 @@ const stockRoutes = require('./routes/stockRoutes');
 
 require('dotenv').config();
 
+const PORT = process.env.PORT || 3001;
+
 fastify.addHook('onRequest', (request, reply, done) => {
   reply.header('Access-Control-Allow-Origin', '*');
   done();
@@ -23,8 +25,12 @@ fastify.register(stockRoutes);
 
 const start = async () => {
   try {
-    await fastify.listen({ port: 3001, host: '0.0.0.0' });
-    console.log('Server is running at http://localhost:3001');
+    await fastify.listen({ port: PORT, host: '0.0.0.0' });
+    console.log(
+      `Server is running at ${
+        process.env.BASE_URL || `http://localhost:${PORT}`
+      }`
+    );
   } catch (err) {
     fastify.log.error(err);
     process.exit(1);
